@@ -77,6 +77,8 @@ struct DeviceView: View {
             }
             if let error = device.transportError {
                 MonoText(error, size: 13)
+                Button("TRY AGAIN") { model.retryConnectionIfUnavailable() }
+                    .buttonStyle(.pixelCompact)
             }
         }
     }

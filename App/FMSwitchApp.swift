@@ -47,4 +47,11 @@ final class AppModel {
     func applyConnectionSettings() {
         device.configure(settings.transportKind, settings: settings)
     }
+
+    /// Starts MIDI again if it couldn't start before. iOS can start the app before it's opened (or
+    /// straight after Xcode installs it), and CoreMIDI may refuse it then.
+    func retryConnectionIfUnavailable() {
+        guard device.transportError != nil else { return }
+        applyConnectionSettings()
+    }
 }

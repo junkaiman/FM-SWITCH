@@ -89,8 +89,9 @@ struct RootView: View {
         }
         .animation(.easeOut(duration: 0.2), value: model.settings.needsSafetyNotice)
         .overlay { CRTOverlay() }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase, initial: true) { _, phase in
             model.device.scenePhaseChanged(to: phase)
+            if phase == .active { model.retryConnectionIfUnavailable() }
         }
     }
 }
