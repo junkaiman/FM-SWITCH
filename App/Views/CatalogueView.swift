@@ -44,16 +44,17 @@ struct CatalogueView: View {
                     }
                 }
             } else {
-                listColumn
+                // A page of its own, so swiping from the left edge goes back.
+                NavigationStack {
+                    listColumn
+                        .background(theme.background.ignoresSafeArea())
+                        .hidesNavigationBar()
+                        .navigationDestination(item: $selected) { entry in
+                            FirmwareDetailView(entry: entry)
+                                .hidesNavigationBar()
+                        }
+                }
             }
-        }
-        // In the wide layout the selected firmware shows beside the list instead.
-        .sheet(item: isWide ? .constant(nil) : $selected) { entry in
-            FirmwareDetailView(entry: entry)
-                .environment(model)
-                .environment(\.phosphor, theme)
-                .pixelSheetSize(isTall: true)
-                .presentationBackground(theme.background)
         }
         #if DEBUG
             // `-openFirmware <id>` opens a firmware's page at launch, for screenshots, once the list

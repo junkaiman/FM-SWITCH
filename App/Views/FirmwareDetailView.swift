@@ -8,7 +8,7 @@ struct FirmwareDetailView: View {
     @State private var errorMessage: String?
     @State private var confirming: StoredFirmware?
     let listed: CatalogueEntry
-    /// Whether it's showing beside a list (the wide layout) rather than in a sheet of its own.
+    /// Whether it's showing beside a list (the wide layout) rather than on a page of its own.
     let isInPane: Bool
 
     init(entry: CatalogueEntry, isInPane: Bool = false) {
@@ -47,12 +47,10 @@ struct FirmwareDetailView: View {
         }
         .scrollIndicators(.hidden)
         .background(theme.background.ignoresSafeArea())
-        // In a pane, the window's own screen effects already cover it.
-        .overlay { if !isInPane { CRTOverlay() } }
         .task { await model.catalogue.checkSource(of: listed.id) }
         .sheet(item: $confirming) { item in
             FlashConfirmView(target: item, requiresOfficial: entry.requiresOfficialFirmware) {
-                // The flash covers the screen; a sheet of its own closes, a pane stays.
+                // The flash covers the screen; a page of its own goes back, a pane stays.
                 if !isInPane { dismiss() }
             }
             .environment(model)

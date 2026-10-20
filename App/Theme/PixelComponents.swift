@@ -277,13 +277,13 @@ extension View {
 }
 
 extension View {
-    /// Sizes a sheet: half or full height on iPhone and iPad (full only when `isTall`), and a
-    /// fixed size on the Mac, where a sheet otherwise shrinks to fit and cuts off scrolling text.
-    func pixelSheetSize(isTall: Bool = false) -> some View {
+    /// Sizes a sheet: half or full height on iPhone and iPad, and a fixed size on the Mac, where a
+    /// sheet otherwise shrinks to fit and cuts off scrolling text.
+    func pixelSheetSize() -> some View {
         #if os(macOS)
-            frame(minWidth: 520, idealWidth: 560, minHeight: isTall ? 640 : 480, idealHeight: isTall ? 720 : 560)
+            frame(minWidth: 520, idealWidth: 560, minHeight: 480, idealHeight: 560)
         #else
-            presentationDetents(isTall ? [.large] : [.medium, .large])
+            presentationDetents([.medium, .large])
         #endif
     }
 }
