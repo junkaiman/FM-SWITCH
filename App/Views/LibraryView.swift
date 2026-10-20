@@ -227,7 +227,8 @@ struct LibraryView: View {
 
     private var storagePanel: some View {
         PixelPanel(title: "STORAGE") {
-            MonoText("\(library.items.count) FILES · \(formattedBytes(library.totalBytes))", size: 15)
+            let count = library.items.count
+            MonoText("\(count) FILE\(count == 1 ? "" : "S") · \(formattedBytes(library.totalBytes))", size: 15)
             if !updatable.isEmpty {
                 MonoText(
                     "\(updatable.count) saved firmware\(updatable.count == 1 ? " has" : "s have") a newer release.",
