@@ -4,6 +4,10 @@ import SwiftUI
 struct FMSwitchApp: App {
     @State private var model = AppModel()
 
+    init() {
+        SystemAppearance.apply()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

@@ -106,7 +106,9 @@ struct CatalogueView: View {
     }
 
     private var firmwareList: some View {
-        ScrollView {
+        PixelRefreshScrollView(isRefreshing: model.catalogue.isRefreshing) {
+            await model.catalogue.refresh()
+        } content: {
             LazyVStack(spacing: 8) {
                 ForEach(visibleEntries) { entry in
                     Button {
@@ -120,8 +122,6 @@ struct CatalogueView: View {
             }
             .padding(.bottom, 16)
         }
-        .scrollIndicators(.hidden)
-        .refreshable { await model.catalogue.refresh() }
     }
 
     /// Says how many links-only firmwares are hidden, with a switch to show or hide them.

@@ -82,9 +82,12 @@ struct LibraryView: View {
         }
     }
 
-    /// One line describing a saved firmware: version, build, identity and size.
+    /// The official firmware, the saved ones and storage, which list beside the picked one when wide.
     private var listColumn: some View {
-        ScrollView {
+        // Pulling down refreshes the firmware list, which shows which saved firmwares have updates.
+        PixelRefreshScrollView(isRefreshing: model.catalogue.isRefreshing) {
+            await model.catalogue.refresh()
+        } content: {
             VStack(alignment: .leading, spacing: 22) {
                 ScreenHeader(title: "SAVED")
                 officialPanel
@@ -96,7 +99,6 @@ struct LibraryView: View {
             }
             .padding(16)
         }
-        .scrollIndicators(.hidden)
     }
 
     /// A saved firmware's catalogue page when it has one, otherwise what the package says.
@@ -135,6 +137,7 @@ struct LibraryView: View {
         }
     }
 
+    /// One line describing a saved firmware: version, build, identity and size.
     private func summary(of item: StoredFirmware) -> String {
         [item.version, item.build.map { "\($0) build" }, item.product, formattedBytes(item.size)]
             .compactMap(\.self)
