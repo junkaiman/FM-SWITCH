@@ -240,7 +240,7 @@ struct FirmwareDetailView: View {
                     )
                 }
                 if let releaseURL = entry.releaseURL {
-                    Link(destination: releaseURL) {
+                    PixelLink(releaseURL) {
                         Text("▸ RELEASE NOTES")
                             .font(.pixel(11, bold: true, relativeTo: .callout))
                             .foregroundStyle(theme.bright)

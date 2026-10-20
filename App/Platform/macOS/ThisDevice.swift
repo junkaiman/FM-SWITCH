@@ -6,7 +6,7 @@ enum ThisDevice {
     static var name: String { "Mac" }
 }
 
-/// The system clipboard.
+/// The system clipboard, for a link's Copy Link (iPhone and iPad copy from the share sheet).
 enum Pasteboard {
     @MainActor
     static func copy(_ url: URL) {

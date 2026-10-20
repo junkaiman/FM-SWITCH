@@ -8,11 +8,3 @@ enum ThisDevice {
         UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "phone"
     }
 }
-
-/// The system clipboard.
-enum Pasteboard {
-    @MainActor
-    static func copy(_ url: URL) {
-        UIPasteboard.general.url = url
-    }
-}

@@ -34,7 +34,7 @@ struct SettingsView: View {
     @ViewBuilder private var romRecovery: some View {
         MonoText(SafetyNotice.romRecovery, size: 14)
         ForEach(SafetyNotice.romRecoveryLinks, id: \.url) { link in
-            Link(destination: link.url) {
+            PixelLink(link.url) {
                 Text("▸ \(link.label.uppercased())")
                     .font(.pixel(11, bold: true, relativeTo: .callout))
                     .foregroundStyle(theme.bright)

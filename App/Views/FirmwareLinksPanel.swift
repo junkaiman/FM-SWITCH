@@ -42,7 +42,7 @@ struct FirmwareLinksPanel: View {
             if index > 0 {
                 Rectangle().fill(theme.faint).frame(height: 1)
             }
-            Link(destination: link.url) {
+            PixelLink(link.url) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("▸ \(link.displayLabel.uppercased())")
                         .font(.pixel(11, bold: true, relativeTo: .callout))
@@ -58,9 +58,6 @@ struct FirmwareLinksPanel: View {
             }
             .accessibilityLabel(link.displayLabel)
             .accessibilityHint(link.url.absoluteString)
-            .contextMenu {
-                Button("Copy link") { Pasteboard.copy(link.url) }
-            }
         }
     }
 }
