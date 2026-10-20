@@ -1,19 +1,35 @@
 import Foundation
 
-/// The merged firmware list, as saved on the phone.
-struct MergedCatalogue: Codable, Sendable, Equatable {
-    var builtAt: Date
+/// The merged firmware list: saved on the phone, and published as fm-1.drewr.dev/firmwares.json.
+public struct MergedCatalogue: Codable, Sendable, Equatable {
+    /// The format this code writes and reads.
+    ///
+    /// It's raised only when a change would break an app that reads the list: a field removed,
+    /// renamed or given another meaning. Added fields keep it, as readers ignore what they don't
+    /// know. An app refuses a list with a format newer than it knows.
+    public static let currentFormat = 1
+
+    /// The list's format; nil in lists saved before it was recorded, which are format 1.
+    public var formatVersion: Int?
+    /// When the list was built.
+    public var builtAt: Date
     /// When the firmware hub last rebuilt its catalogue, as the hub writes it, e.g. "2026-10-14 20:00 UTC".
     var hubUpdated: String?
     var entries: [CatalogueEntry]
     /// Sources that couldn't be read on this refresh, in plain words.
-    var problems: [String]
+    public var problems: [String]
+
+    /// How many firmwares the list has.
+    public var count: Int { entries.count }
+
+    /// Whether an app that knows formats up to ``currentFormat`` can read it.
+    public var isReadable: Bool { (formatVersion ?? 1) <= Self.currentFormat }
 }
 
 /// Builds the merged list: the firmware hub's catalogue, plus the firmwares on fm1-editor.com and
 /// in aroum's FM1 Resource Hub that it doesn't carry, with packages discovered for those where
 /// possible.
-struct CatalogueBuilder: Sendable {
+public struct CatalogueBuilder: Sendable {
     typealias Fetch = PackageDiscovery.Fetch
 
     enum Failure: Error, LocalizedError {
@@ -29,8 +45,15 @@ struct CatalogueBuilder: Sendable {
     var resourceHubURL = ResourceHubListing.defaultURL
     let fetch: Fetch
 
-    init(fetch: @escaping Fetch) {
+    /// - Parameter fetch: Downloads an address, throwing for anything but success.
+    public init(fetch: @escaping @Sendable (URL) async throws -> Data) {
         self.fetch = fetch
+    }
+
+    /// Fetches the lists and merges them, falling back on `previous` for packages that can't be
+    /// found this time.
+    public func build(after previous: MergedCatalogue?) async throws -> MergedCatalogue {
+        try await build(previous: previous?.entries ?? [])
     }
 
     /// Fetches the lists and merges them. `previous` supplies discovered packages to fall back
@@ -78,7 +101,13 @@ struct CatalogueBuilder: Sendable {
             }
             return entries
         }
-        return MergedCatalogue(builtAt: .now, hubUpdated: hub?.updated, entries: resolved, problems: problems)
+        return MergedCatalogue(
+            formatVersion: MergedCatalogue.currentFormat,
+            builtAt: .now,
+            hubUpdated: hub?.updated,
+            entries: resolved,
+            problems: problems
+        )
     }
 
     // MARK: - Merging.

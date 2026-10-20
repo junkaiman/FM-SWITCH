@@ -1,8 +1,11 @@
 import Foundation
 import Observation
 
-/// The firmware list: the firmware hub and fm1-editor.com merged, loaded from the on-device
-/// copy at launch and rebuilt on request.
+/// The firmware list, loaded from the on-device copy at launch and refreshed on request.
+///
+/// A refresh downloads the list fm-1.drewr.dev builds each day from the firmware hub,
+/// fm1-editor.com and aroum's FM1 Resource Hub. If that can't be read, the app builds the list
+/// itself from the same sources.
 @MainActor
 @Observable
 final class CatalogueStore {
@@ -105,7 +108,12 @@ final class CatalogueStore {
         errorMessage = nil
         defer { isRefreshing = false }
         do {
-            let built = try await CatalogueBuilder(fetch: Network.fetch).build(previous: catalogue?.entries ?? [])
+            let built: MergedCatalogue
+            if let published = await Self.published() {
+                built = published
+            } else {
+                built = try await CatalogueBuilder(fetch: Network.fetch).build(previous: catalogue?.entries ?? [])
+            }
             catalogue = built
             // The lists may have caught up; pages check their sources again when opened.
             sourceChecks = [:]
@@ -118,6 +126,20 @@ final class CatalogueStore {
                 ? "Couldn't fetch the firmware list. Check your connection and try again."
                 : "Couldn't refresh; showing the list saved earlier."
         }
+    }
+
+    /// Where fm-1.drewr.dev publishes the list.
+    static let publishedURL = URL(literal: "https://fm-1.drewr.dev/firmwares.json")
+
+    /// The published list, or nil if it can't be read or is in a format this app doesn't know.
+    private static func published() async -> MergedCatalogue? {
+        guard let data = try? await Network.fetch(publishedURL) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let catalogue = try? decoder.decode(MergedCatalogue.self, from: data), catalogue.isReadable,
+            !catalogue.entries.isEmpty
+        else { return nil }
+        return catalogue
     }
 
     private func loadCached() {

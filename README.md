@@ -24,6 +24,8 @@ App/                     SwiftUI app (iOS 17+)
   Resources/Firmware/    M-VAVE's FM-1 V15, unmodified, and its Apache-2.0 notice
   Assets.xcassets/       the app icon, made by scripts/make-icon.py
 AppTests/                firmware list and flashing tests (Swift Testing)
+Package.swift            fm1-catalogue, which builds the published firmware list from App/Catalogue
+Tools/fm1-catalogue/     its command line
 scripts/check.sh         every check CI runs
 scripts/make-icon.py     draws the app icon from its 32 x 32 pixel map (standard and tinted)
 ```
@@ -38,6 +40,25 @@ The list merges three sources: the firmware hub's catalogue, fm1-editor.com and
 [aroum's FM1 Resource Hub](https://github.com/aroum/fm1-custom-fw). Only facts are taken from
 aroum's list (names, authors, links, licences and sections), as its repository has no licence.
 
+fm-1.drewr.dev builds the list once a day with `fm1-catalogue` and publishes it as
+[firmwares.json](https://fm-1.drewr.dev/firmwares.json). The app downloads that, and builds the
+list itself from the same sources only if it can't. Building it on every phone would make about 90
+GitHub API requests per refresh, more than GitHub allows an hour without a token.
+
+`fm1-catalogue` is the app's own list code, `App/Catalogue`, built as a Swift package:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) swift run -c release fm1-catalogue \
+    --output firmwares.json --previous firmwares.json
+```
+
+`--previous` is the last published list: packages that can't be found this time fall back on it,
+and a list more than a fifth shorter is refused. Any exit code but 0 means "don't publish": 1 for
+bad arguments or a failed write, 2 when a source can't be read, 3 for a list that shrank.
+
+`MergedCatalogue.currentFormat` is the file's format, raised only for changes that would break
+an app reading it. The app ignores a list in a newer format and builds its own instead.
+
 ### Working on FM1Kit and the app together
 
 To build against a local FM1Kit checkout at `../FM1Kit` (that is, `~/code/FM1Kit`), generate
@@ -51,7 +72,7 @@ xcodegen generate                            # back to the tagged release
 ```
 
 Before pushing app changes that need unreleased FM1Kit changes, tag a new FM1Kit release and
-raise `minorVersion` in `project.yml`. CI always uses the release.
+raise `minorVersion` in `project.yml` and the matching version in `Package.swift`. CI always uses the release.
 
 ## Running it
 
@@ -113,14 +134,15 @@ This runs everything CI runs, and it must pass with no warnings. It needs
 - does an unsigned iPhone and iPad device build;
 - builds the Mac app with warnings as errors and runs the tests on macOS;
 - builds the DocC documentation with warnings as errors;
-- looks for unused code and imports (`swiftlint analyze` and Periphery).
+- looks for unused code and imports (`swiftlint analyze` and Periphery);
+- builds `fm1-catalogue` with warnings as errors.
 
 To run only some of these, name their groups: `lint`, `build`, `test`, `device`, `mac`,
-`docs` and `unused`. For example, `scripts/check.sh lint` or `scripts/check.sh build test`.
+`docs`, `unused` and `tool`. For example, `scripts/check.sh lint` or `scripts/check.sh build test`.
 `test` and `unused` use the results of `build`. CI runs three parallel jobs:
-`lint device mac docs`, `build test` and `build unused`.
+`lint device mac docs tool`, `build test` and `build unused`.
 
-To fix formatting, run `swift format format --in-place --recursive App AppTests`. Some lint
+To fix formatting, run `swift format format --in-place --recursive App AppTests Tools`. Some lint
 findings can be fixed with `swiftlint --fix`, but check what it changes: it can rewrite a
 closure inside `#require` into a key path, which doesn't compile.
 

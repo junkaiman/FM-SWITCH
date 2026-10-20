@@ -4,6 +4,7 @@
 included:
   - App
   - AppTests
+  - Tools
 
 disabled_rules:
   - opening_brace          # swift-format puts a multi-line signature's brace on its own line.

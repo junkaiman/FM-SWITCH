@@ -14,7 +14,8 @@
 #   mac     the Mac app: a warnings-as-errors build, then the tests on macOS
 #   docs    the DocC documentation, with warnings as errors
 #   unused  SwiftLint analyze and Periphery, on the simulator build
-# CI runs them as parallel jobs: `lint device mac docs`, `build test` and `build unused`.
+#   tool    fm1-catalogue, the command-line tool that builds the published firmware list
+# CI runs them as parallel jobs: `lint device mac docs tool`, `build test` and `build unused`.
 #
 # Tests run on the first available iPhone simulator; set SIMULATOR to pick one by name.
 set -euo pipefail
@@ -48,7 +49,7 @@ require_build() {
 
 check_lint() {
     step "Formatting (swift format)"
-    swift format lint --strict --recursive App AppTests
+    swift format lint --strict --recursive App AppTests Tools Package.swift
 
     step "Lint (SwiftLint)"
     swiftlint lint --strict --quiet
@@ -97,20 +98,29 @@ check_unused() {
     step "Unused code (SwiftLint analyze, Periphery)"
     swiftlint analyze --strict --quiet --compiler-log-path .build/logs/xcodebuild.log
     # FM1Kit is in the same index but has its own Periphery run, so only the app's files are reported.
+    # App/Catalogue is also the FM1Catalogue library that fm1-catalogue uses, so the few declarations
+    # that tool needs are public: Periphery keeps them, and doesn't call them redundant in the app.
     periphery scan --project FMSwitch.xcodeproj --schemes FMSwitch --strict --quiet --skip-build \
+        --retain-public --disable-redundant-public-analysis \
         --index-store-path .build/xcode/Index.noindex/DataStore \
         --report-include 'App/**/*.swift' --report-include 'AppTests/**/*.swift'
 }
 
+check_tool() {
+    step "fm1-catalogue (warnings as errors)"
+    swift build --product fm1-catalogue -Xswiftc -warnings-as-errors > .build/logs/tool.log 2>&1 \
+        || fail_with_log .build/logs/tool.log
+}
+
 groups=("$@")
 if [[ ${#groups[@]} -eq 0 ]]; then
-    groups=(lint build test device mac docs unused)
+    groups=(lint build test device mac docs unused tool)
 fi
 for group in "${groups[@]}"; do
     case "$group" in
-        lint | build | test | device | mac | docs | unused) ;;
+        lint | build | test | device | mac | docs | unused | tool) ;;
         *)
-            echo "Unknown check group: $group (use lint, build, test, device, mac, docs or unused)." >&2
+            echo "Unknown check group: $group (use lint, build, test, device, mac, docs, unused or tool)." >&2
             exit 1
             ;;
     esac
