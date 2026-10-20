@@ -55,17 +55,17 @@ struct CatalogueView: View {
                 .pixelSheetSize(isTall: true)
                 .presentationBackground(theme.background)
         }
-        .task {
-            if model.catalogue.catalogue == nil {
-                await model.catalogue.refresh()
-            }
-            #if DEBUG
-                // `-openFirmware <id>` opens a firmware's page at launch, for screenshots.
-                if let id = UserDefaults.standard.string(forKey: "openFirmware") {
-                    selected = model.catalogue.entry(id: id)
+        #if DEBUG
+            // `-openFirmware <id>` opens a firmware's page at launch, for screenshots, once the list
+            // the app downloads as it opens has arrived.
+            .task {
+                guard let id = UserDefaults.standard.string(forKey: "openFirmware") else { return }
+                while model.catalogue.entry(id: id) == nil {
+                    try? await Task.sleep(for: .milliseconds(200))
                 }
-            #endif
-        }
+                selected = model.catalogue.entry(id: id)
+            }
+        #endif
     }
 
     private var listColumn: some View {

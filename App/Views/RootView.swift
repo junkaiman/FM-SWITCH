@@ -70,6 +70,9 @@ struct RootView: View {
         .disabled(isCovered)
         .accessibilityHidden(isCovered)
         .background(theme.background.ignoresSafeArea())
+        // The firmware list downloads in the background as the app opens, not when FIRMWARE is
+        // first shown; the saved copy shows meanwhile.
+        .task { await model.catalogue.refresh() }
         .overlay {
             // An overlay rather than a cover, so it appears even while a sheet is closing.
             if model.device.job != nil {
