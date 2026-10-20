@@ -10,8 +10,9 @@ struct MergedCatalogue: Codable, Sendable, Equatable {
     var problems: [String]
 }
 
-/// Builds the merged list: the firmware hub's catalogue, plus every firmware on fm1-editor.com
-/// that the hub doesn't carry, with packages discovered for those where possible.
+/// Builds the merged list: the firmware hub's catalogue, plus the firmwares on fm1-editor.com and
+/// in aroum's FM1 Resource Hub that it doesn't carry, with packages discovered for those where
+/// possible.
 struct CatalogueBuilder: Sendable {
     typealias Fetch = PackageDiscovery.Fetch
 
@@ -19,34 +20,46 @@ struct CatalogueBuilder: Sendable {
         case nothingReachable
 
         var errorDescription: String? {
-            "Couldn't reach the firmware hub or fm1-editor.com."
+            "Couldn't reach the firmware hub, fm1-editor.com or aroum's FM1 Resource Hub."
         }
     }
 
     var hubURL = HubFeed.defaultURL
     var editorURL = EditorListing.defaultURL
+    var resourceHubURL = ResourceHubListing.defaultURL
     let fetch: Fetch
 
     init(fetch: @escaping Fetch) {
         self.fetch = fetch
     }
 
-    /// Fetches both lists and merges them. `previous` supplies discovered packages to fall back
+    /// Fetches the lists and merges them. `previous` supplies discovered packages to fall back
     /// on when a project's site or GitHub can't be reached this time.
     func build(previous: [CatalogueEntry] = []) async throws -> MergedCatalogue {
         async let hubData = try? fetch(hubURL)
         async let editorData = try? fetch(editorURL)
+        async let resourceHubData = try? fetch(resourceHubURL)
         let hub = await hubData.flatMap { try? HubFeed.decode($0) }
         let editor = await editorData.flatMap { String(data: $0, encoding: .utf8) }
             .map { html in EditorListing(html: html, pageURL: editorURL) }
+        let resourceHub = await resourceHubData.flatMap { String(data: $0, encoding: .utf8) }
+            .map { markdown in ResourceHubListing(markdown: markdown) }
 
         var problems: [String] = []
         if hub == nil { problems.append("The firmware hub couldn't be read.") }
         if editor == nil || editor?.entries.isEmpty == true { problems.append("fm1-editor.com couldn't be read.") }
-        guard hub != nil || editor?.entries.isEmpty == false else { throw Failure.nothingReachable }
+        if resourceHub == nil || resourceHub?.entries.isEmpty == true {
+            problems.append("aroum's FM1 Resource Hub couldn't be read.")
+        }
+        guard hub != nil || editor?.entries.isEmpty == false || resourceHub?.entries.isEmpty == false else {
+            throw Failure.nothingReachable
+        }
 
         let merged = Self.merge(
-            hub: hub?.entries(relativeTo: hubURL) ?? [], editor: editor?.entries ?? [], editorURL: editorURL)
+            resourceHub: resourceHub?.entries ?? [],
+            into: Self.merge(
+                hub: hub?.entries(relativeTo: hubURL) ?? [], editor: editor?.entries ?? [], editorURL: editorURL)
+        )
         let discovery = PackageDiscovery(fetch: fetch)
         let previousByID = Dictionary(previous.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
@@ -111,6 +124,57 @@ struct CatalogueBuilder: Sendable {
         return entries
     }
 
+    /// Adds aroum's FM1 Resource Hub: what it adds to firmwares already listed, then the rest.
+    static func merge(resourceHub: [ResourceHubListing.Entry], into listed: [CatalogueEntry]) -> [CatalogueEntry] {
+        var entries = listed
+        let pageLink = CatalogueLink(label: "FM1 Resource Hub listing", url: ResourceHubListing.pageURL)
+        // A repository several firmwares share (one repository for HYP-1, LOF-1, ECO-1 and GRAV-1)
+        // doesn't say which firmware is which.
+        let repoCounts = resourceHub.flatMap { Set(repos(in: $0.links)) }.reduce(into: [:]) { $0[$1, default: 0] += 1 }
+        let sharedRepos = Set(repoCounts.filter { $0.value > 1 }.keys)
+        for found in resourceHub {
+            let isSame = { (entry: CatalogueEntry) in
+                matches(entry, links: found.links, name: found.name, ignoringRepos: sharedRepos)
+            }
+            if let index = entries.firstIndex(where: isSame) {
+                var entry = entries[index]
+                entry.listing.insert(.resourceHub)
+                if entry.author == nil { entry.author = found.author }
+                if entry.licence == nil { entry.licence = found.licence }
+                for kind in found.kinds where !entry.kinds.contains(kind) {
+                    entry.kinds.append(kind)
+                }
+                for link in found.links + [pageLink]
+                where !entry.links.contains(where: { $0.comparable == link.comparable }) {
+                    entry.links.append(link)
+                }
+                entries[index] = entry
+            } else {
+                let id = "resource-hub-\(slug(found.name))"
+                // Each entry needs its own ID: two the same would show as a blank row.
+                guard !entries.contains(where: { $0.id == id }) else { continue }
+                entries.append(
+                    CatalogueEntry(
+                        id: id,
+                        name: found.name,
+                        author: found.author,
+                        kinds: found.kinds,
+                        links: found.links + [pageLink],
+                        listing: .resourceHub,
+                        licence: found.licence
+                    ))
+            }
+        }
+        return entries
+    }
+
+    /// A name as an ID: lowercase letters and numbers, joined by hyphens.
+    static func slug(_ name: String) -> String {
+        name.lowercased()
+            .split(whereSeparator: { !($0.isLetter || $0.isNumber) || !$0.isASCII })
+            .joined(separator: "-")
+    }
+
     /// Whether an editor listing is M-VAVE's V15: the "stock" entry, or one linking to m-vave.com.
     ///
     /// M-VAVE's open-source firmware (FM1 Open) links there too, but isn't V15, so it's listed as
@@ -123,14 +187,70 @@ struct CatalogueBuilder: Sendable {
 
     /// The same firmware: a shared GitHub repository, or the same name once punctuation is ignored.
     static func matches(_ entry: CatalogueEntry, _ listed: EditorListing.Entry) -> Bool {
-        var entryLinks = entry.links
+        sharesRepo(entry, listed.links) || normalisedName(entry.name) == normalisedName(listed.name)
+    }
+
+    /// The same firmware as one in another list: a shared GitHub repository (other than
+    /// `ignoringRepos`), the same name once punctuation is ignored, or a shared project site when
+    /// the names start the same way.
+    ///
+    /// A name matches any of its " / " alternatives, as "FANTASMA / Pelucco" does Fantasma. A site
+    /// matches a page under it, as baudgirl.com does baudgirl.com/work/FM-1+VA. A site alone isn't
+    /// enough, as one can host several firmwares: designburgapps.com has OberVave and FM-1 Doom.
+    static func matches(
+        _ entry: CatalogueEntry, links: [CatalogueLink], name: String, ignoringRepos: Set<String> = []
+    ) -> Bool {
+        let theirRepos = Set(repos(in: links)).subtracting(ignoringRepos)
+        if !theirRepos.isDisjoint(with: repos(of: entry)) { return true }
+        let names = name.components(separatedBy: " / ")
+        if names.map(normalisedName).contains(normalisedName(entry.name)) { return true }
+        guard names.contains(where: { firstWord($0) == firstWord(entry.name) }) else { return false }
+        let ours = entry.links.filter(isProjectSite).map(\.comparable)
+        let theirs = links.filter(isProjectSite).map(\.comparable)
+        return ours.contains { site in theirs.contains { isSameSite(site, $0) } }
+    }
+
+    /// A name's first word, in lowercase letters and numbers, e.g. "baud" for "Baud Girl (FM-1+VA)".
+    private static func firstWord(_ name: String) -> String {
+        normalisedName(name.split(separator: " ").first.map(String.init) ?? "")
+    }
+
+    /// The same address, or one a page under the other.
+    ///
+    /// Not across a GitHub Pages host, which one person's projects share.
+    private static func isSameSite(_ first: String, _ second: String) -> Bool {
+        if first == second { return true }
+        let (shorter, longer) = first.count < second.count ? (first, second) : (second, first)
+        return !shorter.hasSuffix("github.io") && longer.hasPrefix(shorter + "/")
+    }
+
+    private static func sharesRepo(_ entry: CatalogueEntry, _ links: [CatalogueLink]) -> Bool {
+        !Set(repos(in: links)).isDisjoint(with: repos(of: entry))
+    }
+
+    /// The GitHub repositories an entry links to, or names, as "owner/name" in lowercase.
+    private static func repos(of entry: CatalogueEntry) -> Set<String> {
+        var links = entry.links
         if let repo = entry.repo, let url = URL(string: "https://github.com/\(repo)") {
-            entryLinks.append(CatalogueLink(label: "", url: url))
+            links.append(CatalogueLink(label: "", url: url))
         }
-        let ours = Set(PackageDiscovery.gitHubRepos(in: entryLinks).map { "\($0.owner)/\($0.name)".lowercased() })
-        let theirs = Set(PackageDiscovery.gitHubRepos(in: listed.links).map { "\($0.owner)/\($0.name)".lowercased() })
-        if !ours.isDisjoint(with: theirs) { return true }
-        return normalisedName(entry.name) == normalisedName(listed.name)
+        return Set(repos(in: links))
+    }
+
+    /// The GitHub repositories links point at, including through GitHub Pages, as "owner/name".
+    private static func repos(in links: [CatalogueLink]) -> [String] {
+        PackageDiscovery.gitHubRepos(in: links).map { "\($0.owner)/\($0.name)".lowercased() }
+    }
+
+    /// A link that identifies one project: not GitHub (matched by repository instead), nor a
+    /// community or video site that hosts many.
+    private static func isProjectSite(_ link: CatalogueLink) -> Bool {
+        guard let host = link.url.host()?.lowercased() else { return false }
+        let shared = [
+            "github.com", "reddit.com", "youtube.com", "youtu.be", "discord.gg", "discord.com", "instagram.com",
+            "fm1-editor.com", "thefirmwarehub.com",
+        ]
+        return !shared.contains { host == $0 || host.hasSuffix(".\($0)") }
     }
 
     static func normalisedName(_ name: String) -> String {

@@ -12,13 +12,14 @@ See `PLAN.md` for the research and the phased plan.
 project.yml              XcodeGen spec (the .xcodeproj is generated, not committed)
 App/                     SwiftUI app (iOS 17+)
   Theme/                 8-bit look: accent colour, pixel fonts, pixel boxes, optional CRT effects
-  Catalogue/             merged firmware list: thefirmwarehub.com feed + fm1-editor.com page,
-                         package discovery (GitHub releases, publisher manifests, project pages,
-                         M-VAVE's downloads), live checks for newer releases and their builds
+  Catalogue/             merged firmware list: thefirmwarehub.com feed, fm1-editor.com page and
+                         aroum's FM1 Resource Hub README; package discovery (GitHub releases,
+                         publisher manifests, project pages, M-VAVE's downloads); live checks
+                         for newer releases and their builds
   Model/                 settings, catalogue, saved firmwares, flash history, device controller
   Views/                 Device, Firmware (catalogue), Saved, Setup, Flash; the wide layout
                          (sidebar and two panes) for iPad and Mac
-  Platform/iOS, macOS/   the few things done differently on each: staying awake, the clipboard
+  Platform/iOS, macOS/   the few things done differently on each: staying awake, links, navigation
   Resources/Fonts/       Departure Mono, Silkscreen, VT323 (SIL OFL)
   Resources/Firmware/    M-VAVE's FM-1 V15, unmodified, and its Apache-2.0 notice
   Assets.xcassets/       the app icon, made by scripts/make-icon.py
@@ -30,6 +31,12 @@ scripts/make-icon.py     draws the app icon from its 32 x 32 pixel map (standard
 Talking to the FM-1 (the update protocol, `.fwsc` packages, CoreMIDI and a simulated FM-1)
 is [FM1Kit](https://github.com/ocean/FM1Kit), an open-source Swift package. `project.yml`
 uses its tagged release from GitHub, taking 0.2.x fixes but not 0.3.0, which may change the API.
+
+### The firmware list
+
+The list merges three sources: the firmware hub's catalogue, fm1-editor.com and
+[aroum's FM1 Resource Hub](https://github.com/aroum/fm1-custom-fw). Only facts are taken from
+aroum's list (names, authors, links, licences and sections), as its repository has no licence.
 
 ### Working on FM1Kit and the app together
 
@@ -117,7 +124,7 @@ To fix formatting, run `swift format format --in-place --recursive App AppTests`
 findings can be fixed with `swiftlint --fix`, but check what it changes: it can rewrite a
 closure inside `#require` into a key path, which doesn't compile.
 
-The app's tests cover the firmware list (reading both lists, merging, finding packages,
+The app's tests cover the firmware list (reading the three lists, merging, finding packages,
 version ordering and build names) and flashing against the simulated FM-1 (install, resume after
 a pulled cable, confirming the same identity and refusing V15 over V15). FM1Kit has its own tests
 and checks in its repository.

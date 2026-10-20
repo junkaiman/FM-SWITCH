@@ -95,6 +95,7 @@ struct FirmwareDetailView: View {
             if let date = entry.date { detailRow("RELEASED", date) }
             if let stored { detailRow("SAVED", stored.savedAt.formatted(date: .abbreviated, time: .shortened)) }
             if !entry.kinds.isEmpty { detailRow("KIND", entry.kinds.joined(separator: ", ")) }
+            if let licence = entry.licence { detailRow("LICENCE", licence) }
             if let stars = entry.stars { detailRow("STARS", "★ \(stars)") }
             detailRow("RECOVERY", entry.rescueMode?.summary ?? "Not known")
             detailRow("LISTED ON", listedOn)
@@ -121,9 +122,13 @@ struct FirmwareDetailView: View {
     }
 
     private var listedOn: String {
-        [entry.listing.contains(.hub) ? "Firmware hub" : nil, entry.listing.contains(.editor) ? "fm1-editor.com" : nil]
-            .compactMap(\.self)
-            .joined(separator: " + ")
+        [
+            entry.listing.contains(.hub) ? "Firmware hub" : nil,
+            entry.listing.contains(.editor) ? "fm1-editor.com" : nil,
+            entry.listing.contains(.resourceHub) ? "FM1 Resource Hub" : nil,
+        ]
+        .compactMap(\.self)
+        .joined(separator: " + ")
     }
 
     private var packageSource: String {

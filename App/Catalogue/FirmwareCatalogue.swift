@@ -1,6 +1,7 @@
 import Foundation
 
-/// One firmware in the merged list, from the firmware hub, fm1-editor.com, or both.
+/// One firmware in the merged list, from the firmware hub, fm1-editor.com, aroum's FM1 Resource
+/// Hub, or several of them.
 ///
 /// Hub entries always carry a package with a size and SHA-256. Entries found only on
 /// fm1-editor.com get their package from wherever it can be discovered (a GitHub release,
@@ -13,6 +14,7 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
 
         static let hub = Self(rawValue: 1 << 0)
         static let editor = Self(rawValue: 1 << 1)
+        static let resourceHub = Self(rawValue: 1 << 2)
     }
 
     /// Where the package link came from.
@@ -77,6 +79,8 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
     var releaseURL: URL?
     /// The project's star count, as the firmware lists give it.
     var stars: Int?
+    /// The licence, as aroum's FM1 Resource Hub gives it, e.g. "Open Source (GPL-3.0-only)".
+    var licence: String?
 
     init(
         id: String,
@@ -97,7 +101,8 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
         repo: String? = nil,
         listing: Listing,
         isOfficial: Bool = false,
-        stars: Int? = nil
+        stars: Int? = nil,
+        licence: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -118,6 +123,7 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
         self.listing = listing
         self.isOfficial = isOfficial
         self.stars = stars
+        self.licence = licence
     }
 
     /// True when the official firmware has to be running before this one can be installed.
