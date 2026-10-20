@@ -54,8 +54,10 @@ targets:
         # The Mac's equivalent: every font in the app's Resources folder.
         ATSApplicationFontsPath: .
         LSApplicationCategoryType: public.app-category.music
+        # The pixel-art icon on the app's background, drawn by scripts/make-icon.py.
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: LaunchBackground
+          UIImageName: LaunchIcon
         UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

@@ -6,6 +6,8 @@ synth's software by flashing it. It's drawn on a 32 x 32 grid, so each cell is e
 of the 1024-pixel icon, with a one-cell block shadow like the app's buttons. The Mac's sizes are
 drawn from the same grid.
 
+It also draws the launch screen's icon and background colour.
+
 Run it after changing the map or the colours: `scripts/make-icon.py`. It needs only Python 3.
 """
 
@@ -115,6 +117,16 @@ def render(cells, palette, size=SIZE):
     return rows
 
 
+# The launch screen's icon: the same drawing on a clear background, over the app's background
+# colour, 4 points to a cell.
+LAUNCH_PALETTE = {
+    **PALETTES["AppIcon.png"],
+    ".": (0, 0, 0, 0),
+}
+LAUNCH_POINTS = 128
+# The app's background with the green accent, from PhosphorTheme.background.
+LAUNCH_BACKGROUND = (0x0F, 0x14, 0x11)
+
 # The Mac's icon sizes, in points, each at 1x and 2x.
 MAC_SIZES = [16, 32, 128, 256, 512]
 
@@ -145,6 +157,27 @@ def contents():
     }
 
 
+def write_launch_screen():
+    """Writes the launch screen's icon and background colour, which iPhone and iPad show at once."""
+    cells = with_shadow(read_map())
+    image_set = CATALOGUE / "LaunchIcon.imageset"
+    image_set.mkdir(parents=True, exist_ok=True)
+    images = []
+    for scale in (1, 2, 3):
+        name = f"LaunchIcon@{scale}x.png"
+        (image_set / name).write_bytes(png(render(cells, LAUNCH_PALETTE, LAUNCH_POINTS * scale)))
+        images.append({"idiom": "universal", "scale": f"{scale}x", "filename": name})
+    info = {"author": "xcode", "version": 1}
+    (image_set / "Contents.json").write_text(json.dumps({"images": images, "info": info}, indent=2) + "\n")
+
+    colour_set = CATALOGUE / "LaunchBackground.colorset"
+    colour_set.mkdir(parents=True, exist_ok=True)
+    red, green, blue = (f"0x{value:02X}" for value in LAUNCH_BACKGROUND)
+    colour = {"color-space": "srgb", "components": {"red": red, "green": green, "blue": blue, "alpha": "1.000"}}
+    colours = {"colors": [{"idiom": "universal", "color": colour}], "info": info}
+    (colour_set / "Contents.json").write_text(json.dumps(colours, indent=2) + "\n")
+
+
 def main():
     cells = with_shadow(read_map())
     icon_set = CATALOGUE / "AppIcon.appiconset"
@@ -159,7 +192,8 @@ def main():
             (icon_set / mac_file(points, scale)).write_bytes(png(pixels))
     (icon_set / "Contents.json").write_text(json.dumps(contents(), indent=2) + "\n")
     (CATALOGUE / "Contents.json").write_text(json.dumps({"info": {"author": "xcode", "version": 1}}, indent=2) + "\n")
-    print(f"Wrote {icon_set.relative_to(CATALOGUE.parent.parent)}")
+    write_launch_screen()
+    print(f"Wrote {icon_set.relative_to(CATALOGUE.parent.parent)} and the launch screen's assets")
 
 
 if __name__ == "__main__":
