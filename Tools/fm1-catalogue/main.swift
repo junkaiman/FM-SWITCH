@@ -6,8 +6,9 @@ import Foundation
 //     swift run -c release fm1-catalogue --output firmwares.json [--previous firmwares.json]
 //
 // --previous is the list published last time. Packages that can't be found this time fall back
-// on it, and the new list is refused if it's much shorter. Set GITHUB_TOKEN to raise GitHub's API
-// limit from 60 requests an hour to 1000 or more.
+// on it, and the new list is refused if it's much shorter. Firmwares no list describes get their
+// GitHub repository's description. Set GITHUB_TOKEN to raise GitHub's API limit from 60 requests an
+// hour to 1000 or more.
 //
 // Exit codes, where anything but 0 means "don't publish":
 //   0  written
@@ -86,7 +87,7 @@ func run() async throws {
 
     let catalogue: MergedCatalogue
     do {
-        catalogue = try await CatalogueBuilder(fetch: fetch).build(after: previous)
+        catalogue = try await CatalogueBuilder(fetch: fetch, describesFromGitHub: true).build(after: previous)
     } catch {
         throw Stop(code: 2, message: error.localizedDescription)
     }

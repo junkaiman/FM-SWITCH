@@ -31,6 +31,12 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
         case mvave
     }
 
+    /// Where a description came from, when not from one of the firmware lists.
+    enum DescriptionSource: String, Codable, Sendable, Hashable {
+        /// The project's description on GitHub, in its author's words.
+        case gitHub
+    }
+
     /// One of several packages a release offers, e.g. Melodee's standard and "1core" builds.
     struct Build: Codable, Sendable, Hashable {
         /// What sets this build apart, from its file name: "1core", "bluetooth", or "standard".
@@ -54,6 +60,8 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
     var kinds: [String]
     /// The description.
     var what: String?
+    /// Where ``what`` came from, or nil for a firmware list's own description.
+    var whatSource: DescriptionSource?
     var version: String?
     /// The release date (yyyy-mm-dd).
     var date: String?

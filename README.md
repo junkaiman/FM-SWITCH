@@ -52,6 +52,10 @@ GITHUB_TOKEN=$(gh auth token) swift run -c release fm1-catalogue \
     --output firmwares.json --previous firmwares.json
 ```
 
+Firmwares none of the lists describe get their GitHub repository's description, the author's own
+words, marked with `whatSource: "gitHub"` so the app can say where it's from. A repository several
+firmwares share describes none of them.
+
 `--previous` is the last published list: packages that can't be found this time fall back on it,
 and a list more than a fifth shorter is refused. Any exit code but 0 means "don't publish": 1 for
 bad arguments or a failed write, 2 when a source can't be read, 3 for a list that shrank.

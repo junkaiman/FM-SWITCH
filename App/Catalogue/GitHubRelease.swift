@@ -28,3 +28,8 @@ struct GitHubRelease: Decodable {
         case publishedAt = "published_at"
     }
 }
+
+/// A repository as GitHub's REST API gives it, with only its description.
+struct GitHubRepository: Decodable {
+    var description: String?
+}

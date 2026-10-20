@@ -29,6 +29,9 @@ struct FirmwareDetailView: View {
 
                 if let what = entry.what {
                     MonoText(what, size: 15)
+                    if entry.whatSource == .gitHub {
+                        NoteText("The author's description of the project on GitHub.")
+                    }
                 }
 
                 builds

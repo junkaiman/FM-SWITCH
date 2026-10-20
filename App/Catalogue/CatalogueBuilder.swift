@@ -44,10 +44,17 @@ public struct CatalogueBuilder: Sendable {
     var editorURL = EditorListing.defaultURL
     var resourceHubURL = ResourceHubListing.defaultURL
     let fetch: Fetch
+    /// Whether to fill in missing descriptions from GitHub, at a request per firmware.
+    let describesFromGitHub: Bool
 
-    /// - Parameter fetch: Downloads an address, throwing for anything but success.
-    public init(fetch: @escaping @Sendable (URL) async throws -> Data) {
+    /// - Parameters:
+    ///   - fetch: Downloads an address, throwing for anything but success.
+    ///   - describesFromGitHub: Fill in missing descriptions from each project's GitHub
+    ///     description. It takes a GitHub API request per firmware, so it's for fm1-catalogue,
+    ///     which has a token, not the app.
+    public init(fetch: @escaping @Sendable (URL) async throws -> Data, describesFromGitHub: Bool = false) {
         self.fetch = fetch
+        self.describesFromGitHub = describesFromGitHub
     }
 
     /// Fetches the lists and merges them, falling back on `previous` for packages that can't be
@@ -105,9 +112,50 @@ public struct CatalogueBuilder: Sendable {
             formatVersion: MergedCatalogue.currentFormat,
             builtAt: .now,
             hubUpdated: hub?.updated,
-            entries: resolved,
+            entries: describesFromGitHub ? await describe(resolved, previous: previousByID) : resolved,
             problems: problems
         )
+    }
+
+    // MARK: - Descriptions.
+
+    /// Fills in firmwares without a description from their GitHub repository's description,
+    /// falling back on the previous list's when GitHub can't be reached.
+    func describe(_ entries: [CatalogueEntry], previous: [String: CatalogueEntry]) async -> [CatalogueEntry] {
+        let repos = entries.map(Self.describingRepo)
+        let counts = repos.compactMap(\.self).reduce(into: [:]) { $0[$1, default: 0] += 1 }
+        return await withTaskGroup(of: (Int, String?).self) { group in
+            for (index, entry) in entries.enumerated() where entry.what == nil {
+                // A repository several firmwares share describes none of them in particular.
+                guard let repo = repos[index], counts[repo] == 1 else { continue }
+                group.addTask {
+                    let url = URL(literal: "https://api.github.com/repos").appending(path: repo)
+                    guard let data = try? await fetch(url) else {
+                        let earlier = previous[entry.id]
+                        return (index, earlier?.whatSource == .gitHub ? earlier?.what : nil)
+                    }
+                    return (index, try? JSONDecoder().decode(GitHubRepository.self, from: data).description)
+                }
+            }
+            var described = entries
+            for await (index, description) in group {
+                guard let text = description?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
+                else { continue }
+                described[index].what = text
+                described[index].whatSource = .gitHub
+            }
+            return described
+        }
+    }
+
+    /// The GitHub repository whose description describes the firmware, as "owner/name".
+    ///
+    /// It's the listed repository, or the first github.com link. Not one inferred from a GitHub
+    /// Pages site, which can be a shared page for several firmwares.
+    static func describingRepo(of entry: CatalogueEntry) -> String? {
+        if let repo = entry.repo { return repo.lowercased() }
+        let gitHubLinks = entry.links.filter { $0.url.host()?.lowercased() == "github.com" }
+        return PackageDiscovery.gitHubRepos(in: gitHubLinks).first.map { "\($0.owner)/\($0.name)".lowercased() }
     }
 
     // MARK: - Merging.
