@@ -33,11 +33,15 @@ enum Screenshots {
     enum Mirror: String, CaseIterable {
         case raw = "raw.githubusercontent.com"
         case jsDelivr = "cdn.jsdelivr.net"
+        /// Kai's own VPS reverse-proxying the raw host, for networks where both GitHub hosts
+        /// are unreachable.
+        case proxy = "junkaiman.com/ghraw"
 
         func readme(owner: String, name: String) -> URL? {
             switch self {
             case .raw: URL(string: "https://raw.githubusercontent.com/\(owner)/\(name)/HEAD/README.md")
             case .jsDelivr: URL(string: "https://cdn.jsdelivr.net/gh/\(owner)/\(name)@HEAD/README.md")
+            case .proxy: URL(string: "https://junkaiman.com/ghraw/\(owner)/\(name)/HEAD/README.md")
             }
         }
 
@@ -47,6 +51,7 @@ enum Screenshots {
             switch self {
             case .raw: return URL(string: "https://raw.githubusercontent.com/\(repo)/HEAD/\(cleaned)")
             case .jsDelivr: return URL(string: "https://cdn.jsdelivr.net/gh/\(repo)@HEAD/\(cleaned)")
+            case .proxy: return URL(string: "https://junkaiman.com/ghraw/\(repo)/HEAD/\(cleaned)")
             }
         }
     }

@@ -40,6 +40,7 @@ struct PixelLink<Label: View>: View {
 }
 
 /// The in-app browser: the page stays in the app instead of jumping out to Safari.
+/// Presented as a half-height sheet the user can drag up, like the app's other overlays.
 /// Safari's own menu still offers opening it outside.
 @MainActor
 enum InAppBrowser {
@@ -51,7 +52,15 @@ enum InAppBrowser {
         while let presented = top.presentedViewController {
             top = presented
         }
-        top.present(SFSafariViewController(url: url), animated: true)
+        let browser = SFSafariViewController(url: url)
+        // Half the screen first; dragging the grabber (or scrolling) expands it to full.
+        if let sheet = browser.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.largestUndimmedDetentIdentifier = .medium
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+            sheet.prefersGrabberVisible = true
+        }
+        top.present(browser, animated: true)
     }
 }
 
