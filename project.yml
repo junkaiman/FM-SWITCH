@@ -91,6 +91,7 @@ targets:
       configs:
         Debug:
           ENABLE_TESTABILITY: YES
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
   FMSwitchTests:
     type: bundle.unit-test
     platform: auto

@@ -16,11 +16,14 @@ enum Screenshots {
         for branch in ["main", "master"] {
             guard let url = URL(string: "https://raw.githubusercontent.com/\(owner)/\(name)/\(branch)/README.md")
             else { continue }
-            guard let data = try? await fetch(url), let text = String(data: data, encoding: .utf8) else {
+            do {
+                let data = try await fetch(url)
+                let text = String(data: data, encoding: .utf8) ?? ""
+                let images = imageURLs(in: text, repo: repo)
+                if !images.isEmpty { return Array(images.prefix(limit)) }
+            } catch {
                 continue
             }
-            let images = imageURLs(in: text, repo: repo)
-            if !images.isEmpty { return Array(images.prefix(limit)) }
         }
         return []
     }
