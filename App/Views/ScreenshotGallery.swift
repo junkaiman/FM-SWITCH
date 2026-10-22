@@ -9,35 +9,44 @@ struct ScreenshotGallery: View {
     let entry: CatalogueEntry
 
     var body: some View {
-        Group {
-            if let found = model.catalogue.screenshots[entry.id], !found.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(found, id: \.absoluteString) { url in
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                case .failure:
-                                    frame(content: NoteText("Couldn't load"))
-                                default:
-                                    frame(content: NoteText("…"))
+        PixelPanel(title: "SCREENSHOTS") {
+            Group {
+                if let found = model.catalogue.screenshots[entry.id], !found.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(found, id: \.absoluteString) { url in
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                    case .failure:
+                                        frame(content: NoteText("Couldn't load"))
+                                    default:
+                                        frame(content: NoteText("…"))
+                                    }
                                 }
+                                .frame(maxHeight: 200)
+                                .overlay(PixelBox().strokeBorder(theme.faint, lineWidth: 2))
                             }
-                            .frame(maxHeight: 200)
-                            .overlay(PixelBox().strokeBorder(theme.faint, lineWidth: 2))
                         }
+                        .padding(2)
                     }
-                    .padding(2)
+                } else if model.catalogue.screenshots[entry.id] == nil {
+                    NoteText("Looking for screenshots in the project's README…")
+                } else {
+                    NoteText("No pictures in the project's README, or none could be fetched.")
+                    #if DEBUG
+                        if let trace = model.catalogue.screenshotTraces[entry.id] {
+                            MonoText(trace, size: 11)
+                        }
+                    #endif
                 }
-            } else if model.catalogue.screenshots[entry.id] == nil {
-                NoteText("Looking for screenshots in the project's README…")
             }
+            .task { await model.catalogue.fetchScreenshots(of: entry.id) }
+            .accessibilityLabel("Pictures of \(entry.name)")
         }
-        .task { await model.catalogue.fetchScreenshots(of: entry.id) }
-        .accessibilityLabel("Pictures of \(entry.name)")
     }
 
     private func frame(content: some View) -> some View {

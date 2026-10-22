@@ -20,6 +20,8 @@ final class CatalogueStore {
     }
     /// The screenshots found in each firmware's README, by catalogue ID.
     private(set) var screenshots: [String: [URL]] = [:]
+    /// What each mirror returned when a firmware's pictures were last looked for, by ID.
+    private(set) var screenshotTraces: [String: String] = [:]
 
     private let cacheURL: URL
 
@@ -113,6 +115,7 @@ final class CatalogueStore {
         }
         screenshots[id] = []
         let (found, trace) = await Screenshots.discover(repo: repo, fetch: Network.fetch)
+        screenshotTraces[id] = trace
         #if DEBUG
             let debugLine = "\(Date.now) \(id) \(repo) -> \(found.count) [\(trace)]\n"
             let debugURL = AppDirectories.support.appending(path: "screenshots-debug.txt")
