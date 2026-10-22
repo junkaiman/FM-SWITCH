@@ -25,6 +25,9 @@ struct FirmwareDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                if entry.socialPreviewURL != nil {
+                    FirmwareImage(entry: entry)
+                }
                 sourceCheck
 
                 if let what = entry.what {

@@ -178,7 +178,13 @@ private struct CatalogueRow: View {
     var isSelected = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: 12) {
+            if entry.socialPreviewURL != nil {
+                FirmwareImage(entry: entry, height: 58)
+                    .frame(width: 96)
+                    .fixedSize(horizontal: true, vertical: true)
+            }
+            VStack(alignment: .leading, spacing: 6) {
             title
             if let what = entry.what {
                 Text(what)
@@ -189,6 +195,7 @@ private struct CatalogueRow: View {
                     .multilineTextAlignment(.leading)
             }
             tags
+        }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

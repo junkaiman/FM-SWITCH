@@ -139,6 +139,15 @@ struct CatalogueEntry: Codable, Sendable, Identifiable, Hashable {
         loader?.lowercased() == "mvave"
     }
 
+    /// The project's social preview on GitHub, as an image for the firmware's page.
+    /// GitHub serves it without authentication for any public repository.
+    var socialPreviewURL: URL? {
+        guard let repo, repo.split(separator: "/").count == 2,
+            let url = URL(string: "https://opengraph.githubassets.com/1/\(repo)")
+        else { return nil }
+        return url
+    }
+
     var isDownloadable: Bool { packageURL != nil }
 
     /// True when the publisher (or the hub) states the package's SHA-256.
