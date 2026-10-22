@@ -112,9 +112,9 @@ final class CatalogueStore {
             return
         }
         screenshots[id] = []
-        let found = await Screenshots.discover(repo: repo, fetch: Network.fetch)
+        let (found, trace) = await Screenshots.discover(repo: repo, fetch: Network.fetch)
         #if DEBUG
-            let debugLine = "\(Date.now) \(id) \(repo) -> \(found.count) \(found.map(\.lastPathComponent))\n"
+            let debugLine = "\(Date.now) \(id) \(repo) -> \(found.count) [\(trace)]\n"
             let debugURL = AppDirectories.support.appending(path: "screenshots-debug.txt")
             if let handle = try? FileHandle(forWritingTo: debugURL) {
                 defer { try? handle.close() }
