@@ -1,6 +1,6 @@
-import SafariServices
 import SwiftUI
 import UIKit
+import WebKit
 
 /// A link: tapping opens it in the in-app browser, and pressing and holding opens the share
 /// sheet, as links do elsewhere on iPhone and iPad.
@@ -8,6 +8,7 @@ struct PixelLink<Label: View>: View {
     /// Where the link is in its window, for pointing the iPad's share popover at it.
     @State private var frame = CGRect.zero
     @State private var shares = 0
+    @State private var browsing = false
     private let url: URL
     private let label: Label
 
@@ -24,12 +25,15 @@ struct PixelLink<Label: View>: View {
             } action: { newFrame in
                 frame = newFrame
             }
-            .onTapGesture { InAppBrowser.present(url) }
+            .onTapGesture { browsing = true }
             .onLongPressGesture { share() }
             .sensoryFeedback(.impact, trigger: shares)
+            .sheet(isPresented: $browsing) {
+                BrowserSheet(url: url)
+            }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isLink)
-            .accessibilityAction { InAppBrowser.present(url) }
+            .accessibilityAction { browsing = true }
             .accessibilityAction(named: "Share") { share() }
     }
 
@@ -39,29 +43,45 @@ struct PixelLink<Label: View>: View {
     }
 }
 
-/// The in-app browser: the page stays in the app instead of jumping out to Safari.
-/// Presented as a half-height sheet the user can drag up, like the app's other overlays.
-/// Safari's own menu still offers opening it outside.
+/// The in-app browser: a half-height sheet that the user can drag up to full height, with a
+/// web view inside. SFSafariViewController can't take sheet detents, so this is a plain web
+/// view; the sheet's share button offers opening the page in Safari.
 @MainActor
-enum InAppBrowser {
-    static func present(_ url: URL) {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let window = scenes.first(where: { $0.activationState == .foregroundActive })?.keyWindow,
-            var top = window.rootViewController
-        else { return }
-        while let presented = top.presentedViewController {
-            top = presented
+struct BrowserSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let url: URL
+
+    var body: some View {
+        NavigationStack {
+            BrowserWebView(url: url)
+                .ignoresSafeArea(edges: .bottom)
+                .navigationTitle(url.host ?? url.absoluteString)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { dismiss() }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ShareLink(item: url)
+                    }
+                }
         }
-        let browser = SFSafariViewController(url: url)
-        // Half the screen first; dragging the grabber (or scrolling) expands it to full.
-        if let sheet = browser.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.largestUndimmedDetentIdentifier = .medium
-            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
-            sheet.prefersGrabberVisible = true
-        }
-        top.present(browser, animated: true)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
+}
+
+private struct BrowserWebView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let view = WKWebView()
+        view.allowsBackForwardNavigationGestures = true
+        view.load(URLRequest(url: url))
+        return view
+    }
+
+    func updateUIView(_ view: WKWebView, context: Context) {}
 }
 
 /// The system share sheet, which SwiftUI's ShareLink can't open from a press and hold.
