@@ -116,17 +116,6 @@ final class CatalogueStore {
         screenshots[id] = []
         let (found, trace) = await Screenshots.discover(repo: repo, fetch: Network.fetch)
         screenshotTraces[id] = trace
-        #if DEBUG
-            let debugLine = "\(Date.now) \(id) \(repo) -> \(found.count) [\(trace)]\n"
-            let debugURL = AppDirectories.support.appending(path: "screenshots-debug.txt")
-            if let handle = try? FileHandle(forWritingTo: debugURL) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: Data(debugLine.utf8))
-            } else {
-                try? Data(debugLine.utf8).write(to: debugURL)
-            }
-        #endif
         // The list may have been refreshed meanwhile; IDs are stable, so keep the result.
         screenshots[id] = found
     }
