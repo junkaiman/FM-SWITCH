@@ -22,6 +22,8 @@ settings:
     # Xcode builds a fetched package with warnings suppressed, which clashes.
     SWIFT_TREAT_WARNINGS_AS_ERRORS: $(FMSWITCH_STRICT)
     GCC_TREAT_WARNINGS_AS_ERRORS: $(FMSWITCH_STRICT)
+    # Xcode 27 no longer ships x86_64 simulator slices for packages like FM1Kit.
+    ONLY_ACTIVE_ARCH: YES
 targets:
   FMSwitch:
     type: application
@@ -70,9 +72,15 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.drewrobinson.fmswitch
+        # XcodeGen 2.46 doesn't emit PRODUCT_NAME and Xcode 27 has no fallback, which makes
+        # both targets try to produce a nameless ".app".
+        PRODUCT_NAME: FMSwitch
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1,2"
+        # Xcode 27 leaves an empty SUPPORTED_PLATFORMS (from SDKROOT=auto) unresolvable,
+        # so list the platforms explicitly.
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator macosx"
         CODE_SIGN_STYLE: Automatic
         # The Mac app is sandboxed: it reaches the network, opens files the person picks, and
         # talks MIDI, which the sandbox allows.
