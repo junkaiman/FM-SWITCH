@@ -8,29 +8,53 @@ enum Screenshots {
     /// Up to this many images, in the order the README shows them.
     private static let limit = 8
 
-    /// The image URLs in the project's README, resolved against the repository, or [] if the
-    /// README can't be read or shows no usable images.
+    /// The images in the project's README, or [] if no mirror can be read or it shows no
+    /// usable images.
+    ///
+    /// Files come from raw.githubusercontent.com, with jsDelivr's CDN as a fallback: on some
+    /// networks the raw host is unreachable, and the CDN serves the same files worldwide.
+    /// The mirror that supplied the README also serves the images, so they load.
     static func discover(repo: String, fetch: @escaping (URL) async throws -> Data) async -> [URL] {
-        guard let owner = repo.split(separator: "/").first, let name = repo.split(separator: "/").last
-        else { return [] }
-        for branch in ["main", "master"] {
-            guard let url = URL(string: "https://raw.githubusercontent.com/\(owner)/\(name)/\(branch)/README.md")
+        let parts = repo.split(separator: "/")
+        guard parts.count == 2 else { return [] }
+        let owner = String(parts[0]), name = String(parts[1])
+        for mirror in Mirror.allCases {
+            guard let readme = mirror.readme(owner: owner, name: name),
+                let data = try? await fetch(readme),
+                let text = String(data: data, encoding: .utf8)
             else { continue }
-            do {
-                let data = try await fetch(url)
-                let text = String(data: data, encoding: .utf8) ?? ""
-                let images = imageURLs(in: text, repo: repo)
-                if !images.isEmpty { return Array(images.prefix(limit)) }
-            } catch {
-                continue
-            }
+            let images = imageURLs(in: text, repo: repo, mirror: mirror)
+            if !images.isEmpty { return Array(images.prefix(limit)) }
         }
         return []
     }
 
+    /// A GitHub file mirror: how to reach a repository's README and its images.
+    enum Mirror: String, CaseIterable {
+        case raw = "raw.githubusercontent.com"
+        case jsDelivr = "cdn.jsdelivr.net"
+
+        func readme(owner: String, name: String) -> URL? {
+            switch self {
+            case .raw: URL(string: "https://raw.githubusercontent.com/\(owner)/\(name)/HEAD/README.md")
+            case .jsDelivr: URL(string: "https://cdn.jsdelivr.net/gh/\(owner)/\(name)@HEAD/README.md")
+            }
+        }
+
+        /// A relative README path as an image URL on this mirror.
+        func image(_ path: String, repo: String) -> URL? {
+            let cleaned = path.trimmingCharacters(in: CharacterSet(charactersIn: "./"))
+            switch self {
+            case .raw: return URL(string: "https://raw.githubusercontent.com/\(repo)/HEAD/\(cleaned)")
+            case .jsDelivr: return URL(string: "https://cdn.jsdelivr.net/gh/\(repo)@HEAD/\(cleaned)")
+            }
+        }
+    }
+
     /// The images a README shows: markdown `![alt](url)` and HTML `<img src="url">`, relative
-    /// paths resolved. Logos, badges and icons aren't screenshots, so they're left out.
-    static func imageURLs(in text: String, repo: String) -> [URL] {
+    /// paths resolved against the mirror. Logos, badges and icons aren't screenshots, so
+    /// they're left out.
+    static func imageURLs(in text: String, repo: String, mirror: Mirror = .raw) -> [URL] {
         var seen = Set<String>()
         var urls: [URL] = []
         let pattern =
@@ -42,22 +66,19 @@ enum Screenshots {
         let range = NSRange(text.startIndex..., in: text)
         for match in regex.matches(in: text, range: range) {
             for group in [1, 2] {
-                guard let matchRange = Range(match.range(at: group), in: text),
-                    let url = resolve(text[matchRange], repo: repo)
-                else { continue }
-                if seen.insert(url.absoluteString).inserted { urls.append(url) }
+                guard let matchRange = Range(match.range(at: group), in: text) else { continue }
+                let address = String(text[matchRange])
+                let url: URL?
+                if let absolute = URL(string: address), absolute.scheme != nil {
+                    url = absolute
+                } else {
+                    url = mirror.image(address, repo: repo)
+                }
+                guard let url, seen.insert(url.absoluteString).inserted else { continue }
+                urls.append(url)
             }
         }
         return urls.filter { !isOrnament($0) }
-    }
-
-    /// A README path, or an absolute address, as a fetchable URL.
-    private static func resolve(_ address: Substring, repo: String) -> URL? {
-        let text = String(address)
-        if let url = URL(string: text), url.scheme != nil { return url }
-        // A branch-qualified or plain relative path on GitHub.
-        let cleaned = text.trimmingCharacters(in: CharacterSet(charactersIn: "./"))
-        return URL(string: "https://raw.githubusercontent.com/\(repo)/HEAD/\(cleaned)")
     }
 
     /// Logos, badges and shields: small, named for decoration, or served by GitHub's badge
